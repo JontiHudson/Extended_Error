@@ -1,0 +1,12 @@
+{
+  "name": "extended_err",
+  "version": "1.0.4",
+  "description": "Simple extension of error, including: code, info, handled, logging, toJSON, toString",
+  "main": "build/index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Jonti Hudson",
+  "license": "ISC",
+  "types": "index.d.ts"
+}
