@@ -56,7 +56,7 @@ export default class ExtendedError extends Error {
     if (!handled) this.log('warn');
   }
 
-  handle(handledInfo: any) {
+  handle(handledInfo?: any) {
     this.handled = handledInfo || true;
 
     this.log();
