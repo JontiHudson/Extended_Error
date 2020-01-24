@@ -1,4 +1,4 @@
-type ErrorProps = {
+export type ErrorProps = {
   code: string;
   Error?: Error;
   handled?: any;
@@ -75,7 +75,7 @@ export default class ExtendedError extends Error {
       handled: this.handled,
       info: this.info,
       stack: this.stack,
-      ...(this.Error && { Error: { ...this.Error } }),
+      ...(this.Error && { Error: this.Error }),
     };
   }
 
