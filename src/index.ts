@@ -1,9 +1,9 @@
+type Info = { [prop: string]: any; handled?: boolean };
+
 export type ErrorProps = {
   code: string;
-  Error?: Error;
-  handled?: any;
-  info?: any;
-  message: string;
+  info?: Info;
+  message?: string;
   name?: string;
   stack?: string;
 };
@@ -14,74 +14,111 @@ const MESSAGE_MISSING = 'Message Missing';
 export default class ExtendedError extends Error {
   static errorName = 'Extended Error';
 
-  static transform(error: Error, defaultProps: ErrorProps) {
+  static transform(error: any, defaultProps: ErrorProps, warn?: boolean) {
+    let transformedError: ExtendedError;
+
     if (error instanceof ExtendedError) {
-      return error;
+      transformedError = error;
+    } else if (error instanceof Error) {
+      const { name, message, stack, ...customProps } = error;
+      const originalError = { name, message, ...customProps };
+
+      transformedError = new ExtendedError(
+        {
+          message,
+          stack,
+          ...defaultProps,
+          info: { originalError, ...defaultProps.info },
+        },
+        warn,
+      );
+    } else {
+      transformedError = new ExtendedError(
+        {
+          ...defaultProps,
+          info: { originalError: error, ...defaultProps.info },
+        },
+        warn,
+      );
     }
-    return new ExtendedError({
-      Error: error,
-      message: error.message,
-      stack: error.stack,
-      ...defaultProps,
-    });
+
+    return transformedError;
   }
 
   static JSONreviver(key: string, value: any) {
     if (typeof value === 'object' && value._JSONrev === 'EE') {
       const { _JSONrev, ...props } = value;
-      return new ExtendedError(props);
+      return new ExtendedError(props, false);
     }
     return value;
   }
 
-  code: string;
-  Error?: Error;
-  handled: boolean;
-  info: any;
+  readonly code: string;
+  readonly info: Info;
 
-  constructor(props: ErrorProps) {
-    const { code, Error, handled, info, message, name, stack } = props || {};
+  constructor(props: ErrorProps, warn: boolean = true) {
+    try {
+      const { code, info, message, name, stack } = props || {};
 
-    super(message);
+      super(message);
+      this.code = code || CODE_MISSING;
+      this.info = { handled: false, ...info };
+      this.message = message || MESSAGE_MISSING;
+      this.name = name || ExtendedError.errorName;
 
-    this.code = code || CODE_MISSING;
-    this.handled = handled || false;
-    this.info = info || null;
-    this.message = message || MESSAGE_MISSING;
-    this.name = name || ExtendedError.errorName;
+      if (stack) this.stack = stack;
 
-    if (Error) this.Error = Error;
-    if (stack) this.stack = stack;
-
-    if (!handled) this.log('warn');
+      if (warn) this.log('warn');
+    } catch (error) {
+      console.log({ error });
+      throw new ExtendedError({
+        code: 'EXTENDED_ERROR_CONSTRUCT_ERROR',
+        message: 'Unable to construct extended error',
+      });
+    }
   }
 
   handle(handledInfo?: any) {
-    this.handled = handledInfo || true;
+    this.info.handled = true;
+    if (handledInfo) this.info.handledInfo = handledInfo;
 
     this.log();
   }
 
   log(type?: string) {
-    type === 'warn' ? console.warn(this) : console.log(this);
+    type === 'warn'
+      ? console.warn(this.toString())
+      : console.log(this.toString());
   }
 
   toJSON() {
     return {
-      _JSONrev: 'EE',
       name: this.name,
       code: this.code,
       message: this.message,
-      handled: this.handled,
       info: this.info,
       stack: this.stack,
-      ...(this.Error && { Error: this.Error }),
+      _JSONrev: 'EE',
     };
   }
 
   toString() {
-    const { _JSONrev, ...props } = this.toJSON();
+    const border =
+      '\n---------------------------------------------------------------\n';
 
-    return JSON.stringify(props, null, 2);
+    const trace = this.stack.substring(this.stack.indexOf('\n') + 1);
+
+    const contents =
+      this.name +
+      '\nMessage: ' +
+      this.message +
+      '\nCode: ' +
+      this.code +
+      '\nInfo: ' +
+      JSON.stringify(this.info, null, 2) +
+      '\n' +
+      trace;
+
+    return border + contents + border;
   }
 }
