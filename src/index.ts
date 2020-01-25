@@ -70,7 +70,6 @@ export default class ExtendedError extends Error {
 
       if (warn) this.log('warn');
     } catch (error) {
-      console.log({ error });
       throw new ExtendedError({
         code: 'EXTENDED_ERROR_CONSTRUCT_ERROR',
         message: 'Unable to construct extended error',
