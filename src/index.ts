@@ -9,7 +9,7 @@ export type ErrorProps = {
   info?: ErrorInfo;
   message?: string;
   name?: string;
-  severity?: ErrorSeverity;
+  severity: ErrorSeverity;
   stack?: string;
 };
 
@@ -79,6 +79,7 @@ export default class ExtendedError extends Error {
       throw new ExtendedError({
         code: 'EXTENDED_ERROR_CONSTRUCT_ERROR',
         message: 'Unable to construct extended error',
+        severity: 'HIGH',
       });
     }
   }
