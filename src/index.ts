@@ -1,10 +1,15 @@
-type Info = { [prop: string]: any; handled?: boolean };
+export type ErrorSeverity = 'HIGH' | 'MEDIUM' | 'LOW' | 'NONE' | 'HANDLED';
+
+export type ErrorInfo = {
+  [prop: string]: any;
+};
 
 export type ErrorProps = {
   code: string;
-  info?: Info;
+  info?: ErrorInfo;
   message?: string;
   name?: string;
+  severity?: ErrorSeverity;
   stack?: string;
 };
 
@@ -12,34 +17,35 @@ const CODE_MISSING = 'CODE_MISSING';
 const MESSAGE_MISSING = 'Message Missing';
 
 export default class ExtendedError extends Error {
+  readonly code: string;
+  readonly info: ErrorInfo;
+  readonly message: string;
+  readonly name: string;
+  readonly stack: string;
+  private _severity: ErrorSeverity;
+
   static errorName = 'Extended Error';
 
-  static transform(error: any, defaultProps: ErrorProps, warn?: boolean) {
+  static transform(error: any, defaultProps: ErrorProps) {
     let transformedError: ExtendedError;
 
     if (error instanceof ExtendedError) {
       transformedError = error;
     } else if (error instanceof Error) {
       const { name, message, stack, ...customProps } = error;
-      const originalError = { name, message, ...customProps };
+      const parentError = { name, message, ...customProps };
 
-      transformedError = new ExtendedError(
-        {
-          message,
-          stack,
-          ...defaultProps,
-          info: { originalError, ...defaultProps.info },
-        },
-        warn,
-      );
+      transformedError = new ExtendedError({
+        message,
+        stack,
+        ...defaultProps,
+        info: { parentError, ...defaultProps.info },
+      });
     } else {
-      transformedError = new ExtendedError(
-        {
-          ...defaultProps,
-          info: { originalError: error, ...defaultProps.info },
-        },
-        warn,
-      );
+      transformedError = new ExtendedError({
+        ...defaultProps,
+        info: { parentError: error, ...defaultProps.info },
+      });
     }
 
     return transformedError;
@@ -48,27 +54,27 @@ export default class ExtendedError extends Error {
   static JSONreviver(key: string, value: any) {
     if (typeof value === 'object' && value._JSONrev === 'EE') {
       const { _JSONrev, ...props } = value;
-      return new ExtendedError(props, false);
+      return new ExtendedError(props);
     }
     return value;
   }
 
-  readonly code: string;
-  readonly info: Info;
-
-  constructor(props: ErrorProps, warn: boolean = true) {
+  constructor(props: ErrorProps) {
     try {
-      const { code, info, message, name, stack } = props || {};
+      super(props.message);
 
-      super(message);
-      this.code = code || CODE_MISSING;
-      this.info = { handled: false, ...info };
-      this.message = message || MESSAGE_MISSING;
-      this.name = name || ExtendedError.errorName;
+      const defaultProps = {
+        _severity: 'HIGH',
+        code: CODE_MISSING,
+        info: {},
+        message: MESSAGE_MISSING,
+        name: ExtendedError.errorName,
+      };
 
-      if (stack) this.stack = stack;
+      const { severity, ...rest } = props;
+      Object.assign(this, defaultProps, rest, { _severity: severity });
 
-      if (warn) this.log('warn');
+      this.log();
     } catch (error) {
       throw new ExtendedError({
         code: 'EXTENDED_ERROR_CONSTRUCT_ERROR',
@@ -77,47 +83,68 @@ export default class ExtendedError extends Error {
     }
   }
 
+  get handled() {
+    return this._severity === 'HANDLED';
+  }
+
+  get severity() {
+    return this._severity;
+  }
+
   handle(handledInfo?: any) {
-    this.info.handled = true;
+    this._severity = 'HANDLED';
     if (handledInfo) this.info.handledInfo = handledInfo;
 
-    this.log();
+    console.log(this.toString());
   }
 
-  log(type?: string) {
-    type === 'warn'
-      ? console.warn(this.toString())
-      : console.log(this.toString());
+  log() {
+    switch (this._severity) {
+      case 'HIGH':
+      case 'MEDIUM':
+        console.warn(this.print());
+        break;
+      case 'LOW':
+        console.log(this.print());
+        break;
+      default:
+    }
   }
 
-  toJSON() {
+  print() {
+    const border =
+      '\n---------------------------------------------------------------\n';
+
+    const name = this.toString();
+    const info = Object.keys(this.info).length
+      ? '\nInfo: ' + JSON.stringify(this.info, null, 2)
+      : '';
+    const trace = this.stack.substring(this.stack.indexOf('\n') + 1);
+
+    const contents = name + '\n' + this.message + info + '\n' + trace;
+
+    return border + contents + border;
+  }
+
+  toObject() {
     return {
       name: this.name,
       code: this.code,
       message: this.message,
+      severity: this._severity,
       info: this.info,
       stack: this.stack,
+    };
+  }
+
+  toJSON() {
+    return {
+      ...this.toObject(),
       _JSONrev: 'EE',
     };
   }
 
   toString() {
-    const border =
-      '\n---------------------------------------------------------------\n';
-
-    const trace = this.stack.substring(this.stack.indexOf('\n') + 1);
-
-    const contents =
-      this.name +
-      '\nMessage: ' +
-      this.message +
-      '\nCode: ' +
-      this.code +
-      '\nInfo: ' +
-      JSON.stringify(this.info, null, 2) +
-      '\n' +
-      trace;
-
-    return border + contents + border;
+    return `${this.name} - ${this.code} (${this._severity})`;
   }
 }

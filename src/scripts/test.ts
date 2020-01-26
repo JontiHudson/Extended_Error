@@ -37,7 +37,7 @@ const transformedStringError = ExtendedError.transform(
 transformedJSError.handle('Handle confirmation');
 
 const transformedJSErrorJSON = JSON.stringify(transformedJSError);
-console.log(transformedJSErrorJSON);
+console.log('\n' + transformedJSErrorJSON);
 
 const revivedError = JSON.parse(
   transformedJSErrorJSON,
@@ -45,4 +45,4 @@ const revivedError = JSON.parse(
 );
 
 console.log(`\nError revived: ${revivedError instanceof ExtendedError}`);
-console.log(revivedError.toString());
+console.log(revivedError.print());
