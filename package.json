@@ -1,6 +1,6 @@
 {
   "name": "extended_err",
-  "version": "1.4.1",
+  "version": "1.5.5",
   "description": "Simple extension of error, including: code, info, handled, logging, toJSON, toString",
   "main": "build/index.js",
   "scripts": {

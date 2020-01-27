@@ -43,10 +43,7 @@ transformedJSError.handle('Handle confirmation');
 const transformedJSErrorJSON = JSON.stringify(transformedJSError);
 console.log('\n' + transformedJSErrorJSON);
 
-const revivedError = JSON.parse(
-  transformedJSErrorJSON,
-  ExtendedError.JSONreviver,
-);
+const revivedError = ExtendedError.JSONparse(transformedJSErrorJSON);
 
 console.log(`\nError revived: ${revivedError instanceof ExtendedError}`);
 console.log(revivedError.print());

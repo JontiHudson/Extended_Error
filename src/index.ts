@@ -22,15 +22,16 @@ export default class ExtendedError extends Error {
   readonly message: string;
   readonly name: string;
   readonly stack: string;
-  private _severity: ErrorSeverity;
+  severity: ErrorSeverity;
 
   static errorName = 'Extended Error';
 
-  static transform(error: any, defaultProps: ErrorProps) {
+  static transform(error: any, defaultProps: ErrorProps, warn?: boolean) {
     let transformedError: ExtendedError;
 
     if (error instanceof ExtendedError) {
       transformedError = error;
+      transformedError.addInfo(defaultProps.info);
     } else if (error instanceof Error) {
       const { name, message, stack, ...customProps } = error;
       const parentError = { name, message, ...customProps };
@@ -51,6 +52,22 @@ export default class ExtendedError extends Error {
     return transformedError;
   }
 
+  static JSONparse(JSONstring: string, returnError?: boolean) {
+    try {
+      return JSON.parse(JSONstring, this.JSONreviver);
+    } catch (error) {
+      const parseError = ExtendedError.transform(error, {
+        code: 'PARSE_ERROR',
+        message: 'Unable to parse string',
+        severity: 'HIGH',
+        info: { JSONstring },
+      });
+
+      if (returnError) return parseError;
+      throw parseError;
+    }
+  }
+
   static JSONreviver(key: string, value: any) {
     if (typeof value === 'object' && value._JSONrev === 'EE') {
       const { _JSONrev, ...props } = value;
@@ -59,7 +76,7 @@ export default class ExtendedError extends Error {
     return value;
   }
 
-  constructor(props: ErrorProps) {
+  constructor(props: ErrorProps, warn: boolean = true) {
     try {
       super(props.message);
 
@@ -74,7 +91,7 @@ export default class ExtendedError extends Error {
       const { severity, ...rest } = props;
       Object.assign(this, defaultProps, rest, { _severity: severity });
 
-      this.log();
+      if (warn) this.log();
     } catch (error) {
       throw new ExtendedError({
         code: 'EXTENDED_ERROR_CONSTRUCT_ERROR',
@@ -85,22 +102,31 @@ export default class ExtendedError extends Error {
   }
 
   get handled() {
-    return this._severity === 'HANDLED';
+    return this.severity === 'HANDLED';
   }
 
-  get severity() {
-    return this._severity;
+  addInfo(info?: ErrorInfo) {
+    if (info) Object.assign(this.info, info);
+  }
+
+  changeSeverity(newSeverity: ErrorSeverity) {
+    this.severity = newSeverity;
   }
 
   handle(handledInfo?: any) {
-    this._severity = 'HANDLED';
+    if (this.severity === 'HANDLED') {
+      return false;
+    }
+
+    this.severity = 'HANDLED';
     if (handledInfo) this.info.handledInfo = handledInfo;
 
-    console.log(this.toString());
+    console.log('Handled: ' + this.toString());
+    return true;
   }
 
   log() {
-    switch (this._severity) {
+    switch (this.severity) {
       case 'HIGH':
       case 'MEDIUM':
         console.warn(this.print());
@@ -127,12 +153,12 @@ export default class ExtendedError extends Error {
     return border + contents + border;
   }
 
-  toObject() {
+  toObject(): ErrorProps {
     return {
       name: this.name,
       code: this.code,
       message: this.message,
-      severity: this._severity,
+      severity: this.severity,
       info: this.info,
       stack: this.stack,
     };
@@ -146,6 +172,6 @@ export default class ExtendedError extends Error {
   }
 
   toString() {
-    return `${this.name} - ${this.code} (${this._severity})`;
+    return `${this.name} - ${this.code} (${this.severity})`;
   }
 }
